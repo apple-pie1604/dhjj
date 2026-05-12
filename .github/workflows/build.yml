@@ -1,48 +1,23 @@
-name: Build Signed AAB
-
-on:
-  push:
-    branches: [ main ]
+name: Build Kivy AAB
+on: [push, pull_request]
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
-
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      # Step 1: Decode Keystore from base64
-      - name: Decode Keystore
-        run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android.jks
-
-      # Step 2: Build Release AAB using Buildozer
-      - name: Build Release AAB
+      - name: Build with Buildozer
         uses: digreatbrian/buildozer-action@v2
         with:
-          python-version: 3.11
-          buildozer-cmd: buildozer -v android release
+          # Use 'android release' to trigger AAB creation if configured in .spec
+          # or explicitly pass the command
+          command: buildozer android release
+          buildozer_version: master
 
-      # Step 3: Sign the AAB manually with .jks keystore
-      - name: Sign the AAB manually
-        run: |
-          AAB_PATH=$(find ./bin -name "*-release-unsigned.aab" | head -n 1)
-          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
-            -keystore android.jks \
-            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
-            -keypass "${{ secrets.KEY_PASSWORD }}" \
-            "$AAB_PATH" "${{ secrets.KEY_ALIAS }}"
-
-      # Step 4: Rename the signed AAB
-      - name: Rename the signed AAB
-        run: |
-          AAB_PATH=$(find ./bin -name "*-release-unsigned.aab" | head -n 1)
-          NEW_AAB_PATH="${AAB_PATH/-unsigned/-signed}"
-          mv "$AAB_PATH" "$NEW_AAB_PATH"
-
-      # Step 5: Upload Signed AAB Artifact
-      - name: Upload Signed AAB Artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
         with:
-          name: signed-release-aab
-          path: ./bin/*-release-signed.aab
+          name: package
+          path: bin/*.aab
